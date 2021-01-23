@@ -139,9 +139,9 @@ class Command(BaseCommand):
             # Generate the datasets
             ml_model_file = f'./bots/ml/{bot_name(opponent)}-model.pkl'
             ml_dataset_file = f'datasets/ml-{bot_name(opponent)}-dataset.pkl'
-            create_dataset(ml_dataset_file, opponent, ml_bot_features, [])
+            # create_dataset(ml_dataset_file, opponent, ml_bot_features, [])
             print('Created dataset', ml_dataset_file)
-            train_bot(ml_dataset_file, ml_model_file)
+            # train_bot(ml_dataset_file, ml_model_file)
             print('Output training results to', ml_model_file)
             ml_bot = ml.Bot(model_file=ml_model_file)
 
@@ -154,10 +154,10 @@ class Command(BaseCommand):
                 included_features = all_features.copy()
                 included_features.remove(excluded_feature)
 
-                create_dataset(mf_dataset_file, opponent, mf_bot_features, included_features)
+                # create_dataset(mf_dataset_file, opponent, mf_bot_features, included_features)
                 print('Created dataset', mf_dataset_file)
 
-                train_bot(mf_dataset_file, mf_model_file)
+                # train_bot(mf_dataset_file, mf_model_file)
                 print('Output training results to', mf_model_file)
 
                 missing_feature_bot = ml_missing_feature.Bot(mf_model_file, included_features)
