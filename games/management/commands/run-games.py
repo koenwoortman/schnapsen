@@ -17,7 +17,7 @@ import joblib
 from django.core.management.base import BaseCommand
 from games.models import GameResult
 
-GAMES = 1000
+GAMES = 100
 
 TRAINING_GAMES = 10000
 
@@ -26,7 +26,7 @@ STATE = State.generate()
 def bot_name(bot):
     return bot.__module__.split('.')[2]
 
-def report(player1, player2, winner, points, excluded_feature=None):
+def report(player1, player2, winner, points, inspected, trained_against, excluded_feature=None,):
     player1_name = bot_name(player1)
     player2_name = bot_name(player2)
 
@@ -40,21 +40,23 @@ def report(player1, player2, winner, points, excluded_feature=None):
         player2=player2_name,
         winner=winner_name,
         winner_points=points,
-        excluded_feature=excluded_feature
+        excluded_feature=excluded_feature,
+        inspected=inspected,
+        trained_against=trained_against
     )
 
 
-def play(player1, player2, games=GAMES, excluded_feature=None):
+def play(player1, player2, inspected, trained_against, games=GAMES, excluded_feature=None):
     for i in range(games//2):
         state = State.generate()
 
         winner, points = engine.play(player1, player2, state=state, verbose=False)
 
-        report(player1, player2, winner, points, excluded_feature)
+        report(player1, player2, winner, points, inspected, trained_against, excluded_feature)
 
         winner, points = engine.play(player2, player1, state=state, verbose=False)
 
-        report(player2, player1, winner, points, excluded_feature)
+        report(player2, player1, winner, points, inspected, trained_against, excluded_feature)
 
 def create_dataset(path, player, feature_func, included_features, games=TRAINING_GAMES):
     data = []
@@ -117,7 +119,7 @@ class Command(BaseCommand):
             'perspective',
             'p1_points',
             'p2_points',
-            'p1_pending_points'
+            'p1_pending_points',
             'p2_pending_points',
             'trump_suit_onehot',
             'phase',
@@ -133,12 +135,17 @@ class Command(BaseCommand):
         ]
 
         for opponent in opponents:
+            print('Start experiment against', bot_name(opponent))
             # Generate the datasets
             ml_model_file = f'./bots/ml/{bot_name(opponent)}-model.pkl'
             ml_dataset_file = f'datasets/ml-{bot_name(opponent)}-dataset.pkl'
             create_dataset(ml_dataset_file, opponent, ml_bot_features, [])
+            print('Created dataset', ml_dataset_file)
             train_bot(ml_dataset_file, ml_model_file)
+            print('Output training results to', ml_model_file)
             ml_bot = ml.Bot(model_file=ml_model_file)
+
+            play(ml_bot, opponent, bot_name(ml_bot), bot_name(opponent))
 
             for excluded_feature in all_features:
                 mf_model_file = f'./bots/ml_missing_feature/{bot_name(opponent)}-{excluded_feature}-model.pkl'
@@ -148,13 +155,14 @@ class Command(BaseCommand):
                 included_features.remove(excluded_feature)
 
                 create_dataset(mf_dataset_file, opponent, mf_bot_features, included_features)
+                print('Created dataset', mf_dataset_file)
 
                 train_bot(mf_dataset_file, mf_model_file)
+                print('Output training results to', mf_model_file)
 
                 missing_feature_bot = ml_missing_feature.Bot(mf_model_file, included_features)
 
-                play(ml_bot, opponent, excluded_feature=excluded_feature)
+                play(missing_feature_bot, opponent, bot_name(missing_feature_bot), bot_name(opponent), excluded_feature=excluded_feature)
 
-                play(missing_feature_bot, opponent, excluded_feature=excluded_feature)
-
-                play(missing_feature_bot, ml_bot, excluded_feature=excluded_feature)
+                play(missing_feature_bot, ml_bot, bot_name(missing_feature_bot), bot_name(opponent), excluded_feature=excluded_feature)
+                print('Finished tournaments against', bot_name(opponent), 'with missing feature', excluded_feature)
